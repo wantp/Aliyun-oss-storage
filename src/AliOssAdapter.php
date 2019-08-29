@@ -26,40 +26,43 @@ class AliOssAdapter extends AbstractAdapter
     /**
      * @var array
      */
-    protected static $resultMap = [
-        'Body'           => 'raw_contents',
-        'Content-Length' => 'size',
-        'ContentType'    => 'mimetype',
-        'Size'           => 'size',
-        'StorageClass'   => 'storage_class',
-    ];
+    protected static $resultMap
+        = [
+            'Body'           => 'raw_contents',
+            'Content-Length' => 'size',
+            'ContentType'    => 'mimetype',
+            'Size'           => 'size',
+            'StorageClass'   => 'storage_class',
+        ];
 
     /**
      * @var array
      */
-    protected static $metaOptions = [
-        'CacheControl',
-        'Expires',
-        'ServerSideEncryption',
-        'Metadata',
-        'ACL',
-        'ContentType',
-        'ContentDisposition',
-        'ContentLanguage',
-        'ContentEncoding',
-    ];
+    protected static $metaOptions
+        = [
+            'CacheControl',
+            'Expires',
+            'ServerSideEncryption',
+            'Metadata',
+            'ACL',
+            'ContentType',
+            'ContentDisposition',
+            'ContentLanguage',
+            'ContentEncoding',
+        ];
 
-    protected static $metaMap = [
-        'CacheControl'         => 'Cache-Control',
-        'Expires'              => 'Expires',
-        'ServerSideEncryption' => 'x-oss-server-side-encryption',
-        'Metadata'             => 'x-oss-metadata-directive',
-        'ACL'                  => 'x-oss-object-acl',
-        'ContentType'          => 'Content-Type',
-        'ContentDisposition'   => 'Content-Disposition',
-        'ContentLanguage'      => 'response-content-language',
-        'ContentEncoding'      => 'Content-Encoding',
-    ];
+    protected static $metaMap
+        = [
+            'CacheControl'         => 'Cache-Control',
+            'Expires'              => 'Expires',
+            'ServerSideEncryption' => 'x-oss-server-side-encryption',
+            'Metadata'             => 'x-oss-metadata-directive',
+            'ACL'                  => 'x-oss-object-acl',
+            'ContentType'          => 'Content-Type',
+            'ContentDisposition'   => 'Content-Disposition',
+            'ContentLanguage'      => 'response-content-language',
+            'ContentEncoding'      => 'Content-Encoding',
+        ];
 
     //Aliyun OSS Client OssClient
     protected $client;
@@ -67,7 +70,7 @@ class AliOssAdapter extends AbstractAdapter
     protected $bucket;
 
     protected $endPoint;
-    
+
     protected $cdnDomain;
 
     protected $ssl;
@@ -75,22 +78,23 @@ class AliOssAdapter extends AbstractAdapter
     protected $isCname;
 
     //配置
-    protected $options = [
-        'Multipart'   => 128
-    ];
+    protected $options
+        = [
+            'Multipart' => 128
+        ];
 
 
     /**
      * AliOssAdapter constructor.
      *
-     * @param OssClient $client
-     * @param string    $bucket
-     * @param string    $endPoint
-     * @param bool      $ssl
-     * @param bool      $isCname
-     * @param bool      $debug
-     * @param null      $prefix
-     * @param array     $options
+     * @param   OssClient  $client
+     * @param   string     $bucket
+     * @param   string     $endPoint
+     * @param   bool       $ssl
+     * @param   bool       $isCname
+     * @param   bool       $debug
+     * @param   null       $prefix
+     * @param   array      $options
      */
     public function __construct(
         OssClient $client,
@@ -102,17 +106,16 @@ class AliOssAdapter extends AbstractAdapter
         $cdnDomain,
         $prefix = null,
         array $options = []
-    )
-    {
-        $this->debug = $debug;
+    ) {
+        $this->debug  = $debug;
         $this->client = $client;
         $this->bucket = $bucket;
         $this->setPathPrefix($prefix);
-        $this->endPoint = $endPoint;
-        $this->ssl = $ssl;
-        $this->isCname = $isCname;
+        $this->endPoint  = $endPoint;
+        $this->ssl       = $ssl;
+        $this->isCname   = $isCname;
         $this->cdnDomain = $cdnDomain;
-        $this->options = array_merge($this->options, $options);
+        $this->options   = array_merge($this->options, $options);
     }
 
     /**
@@ -138,81 +141,87 @@ class AliOssAdapter extends AbstractAdapter
     /**
      * Write a new file.
      *
-     * @param string $path
-     * @param string $contents
-     * @param Config $config Config object
+     * @param   string  $path
+     * @param   string  $contents
+     * @param   Config  $config  Config object
      *
      * @return array|false false on failure file meta data on success
      */
     public function write($path, $contents, Config $config)
     {
-        $object = $this->applyPathPrefix($path);
+        $object  = $this->applyPathPrefix($path);
         $options = $this->getOptions($this->options, $config);
 
-        if (! isset($options[OssClient::OSS_LENGTH])) {
+        if (!isset($options[OssClient::OSS_LENGTH])) {
             $options[OssClient::OSS_LENGTH] = Util::contentSize($contents);
         }
-        if (! isset($options[OssClient::OSS_CONTENT_TYPE])) {
+        if (!isset($options[OssClient::OSS_CONTENT_TYPE])) {
             $options[OssClient::OSS_CONTENT_TYPE] = Util::guessMimeType($path, $contents);
         }
         try {
             $this->client->putObject($this->bucket, $object, $contents, $options);
         } catch (OssException $e) {
             $this->logErr(__FUNCTION__, $e);
+
             return false;
         }
+
         return $this->normalizeResponse($options, $path);
     }
 
     /**
      * Write a new file using a stream.
      *
-     * @param string $path
-     * @param resource $resource
-     * @param Config $config Config object
+     * @param   string    $path
+     * @param   resource  $resource
+     * @param   Config    $config  Config object
      *
      * @return array|false false on failure file meta data on success
      */
     public function writeStream($path, $resource, Config $config)
     {
-        $options = $this->getOptions($this->options, $config);
+        $options  = $this->getOptions($this->options, $config);
         $contents = stream_get_contents($resource);
 
         return $this->write($path, $contents, $config);
     }
 
-    public function writeFile($path, $filePath, Config $config){
-        $object = $this->applyPathPrefix($path);
+    public function writeFile($path, $filePath, Config $config)
+    {
+        $object  = $this->applyPathPrefix($path);
         $options = $this->getOptions($this->options, $config);
 
         $options[OssClient::OSS_CHECK_MD5] = true;
 
-        if (! isset($options[OssClient::OSS_CONTENT_TYPE])) {
+        if (!isset($options[OssClient::OSS_CONTENT_TYPE])) {
             $options[OssClient::OSS_CONTENT_TYPE] = Util::guessMimeType($path, '');
         }
         try {
             $this->client->uploadFile($this->bucket, $object, $filePath, $options);
         } catch (OssException $e) {
             $this->logErr(__FUNCTION__, $e);
+
             return false;
         }
+
         return $this->normalizeResponse($options, $path);
     }
 
     /**
      * Update a file.
      *
-     * @param string $path
-     * @param string $contents
-     * @param Config $config Config object
+     * @param   string  $path
+     * @param   string  $contents
+     * @param   Config  $config  Config object
      *
      * @return array|false false on failure file meta data on success
      */
     public function update($path, $contents, Config $config)
     {
-        if (! $config->has('visibility') && ! $config->has('ACL')) {
+        if (!$config->has('visibility') && !$config->has('ACL')) {
             $config->set(static::$metaMap['ACL'], $this->getObjectACL($path));
         }
+
         // $this->delete($path);
         return $this->write($path, $contents, $config);
     }
@@ -220,15 +229,16 @@ class AliOssAdapter extends AbstractAdapter
     /**
      * Update a file using a stream.
      *
-     * @param string $path
-     * @param resource $resource
-     * @param Config $config Config object
+     * @param   string    $path
+     * @param   resource  $resource
+     * @param   Config    $config  Config object
      *
      * @return array|false false on failure file meta data on success
      */
     public function updateStream($path, $resource, Config $config)
     {
         $contents = stream_get_contents($resource);
+
         return $this->update($path, $contents, $config);
     }
 
@@ -237,7 +247,7 @@ class AliOssAdapter extends AbstractAdapter
      */
     public function rename($path, $newpath)
     {
-        if (! $this->copy($path, $newpath)){
+        if (!$this->copy($path, $newpath)) {
             return false;
         }
 
@@ -249,12 +259,13 @@ class AliOssAdapter extends AbstractAdapter
      */
     public function copy($path, $newpath)
     {
-        $object = $this->applyPathPrefix($path);
+        $object    = $this->applyPathPrefix($path);
         $newObject = $this->applyPathPrefix($newpath);
-        try{
+        try {
             $this->client->copyObject($this->bucket, $object, $this->bucket, $newObject);
         } catch (OssException $e) {
             $this->logErr(__FUNCTION__, $e);
+
             return false;
         }
 
@@ -269,14 +280,15 @@ class AliOssAdapter extends AbstractAdapter
         $bucket = $this->bucket;
         $object = $this->applyPathPrefix($path);
 
-        try{
+        try {
             $this->client->deleteObject($bucket, $object);
-        }catch (OssException $e) {
+        } catch (OssException $e) {
             $this->logErr(__FUNCTION__, $e);
+
             return false;
         }
 
-        return ! $this->has($path);
+        return !$this->has($path);
     }
 
     /**
@@ -284,13 +296,12 @@ class AliOssAdapter extends AbstractAdapter
      */
     public function deleteDir($dirname)
     {
-        $dirname = rtrim($this->applyPathPrefix($dirname), '/').'/';
+        $dirname    = rtrim($this->applyPathPrefix($dirname), '/') . '/';
         $dirObjects = $this->listDirObjects($dirname, true);
 
-        if(count($dirObjects['objects']) > 0 ){
+        if (count($dirObjects['objects']) > 0) {
 
-            foreach($dirObjects['objects'] as $object)
-            {
+            foreach ($dirObjects['objects'] as $object) {
                 $objects[] = $object['Key'];
             }
 
@@ -298,6 +309,7 @@ class AliOssAdapter extends AbstractAdapter
                 $this->client->deleteObjects($this->bucket, $objects);
             } catch (OssException $e) {
                 $this->logErr(__FUNCTION__, $e);
+
                 return false;
             }
 
@@ -307,6 +319,7 @@ class AliOssAdapter extends AbstractAdapter
             $this->client->deleteObject($this->bucket, $dirname);
         } catch (OssException $e) {
             $this->logErr(__FUNCTION__, $e);
+
             return false;
         }
 
@@ -315,21 +328,23 @@ class AliOssAdapter extends AbstractAdapter
 
     /**
      * 列举文件夹内文件列表；可递归获取子文件夹；
-     * @param string $dirname 目录
-     * @param bool $recursive 是否递归
+     *
+     * @param   string  $dirname    目录
+     * @param   bool    $recursive  是否递归
+     *
      * @return mixed
      * @throws OssException
      */
-    public function listDirObjects($dirname = '', $recursive =  false)
+    public function listDirObjects($dirname = '', $recursive = false)
     {
-        $delimiter = '/';
+        $delimiter  = '/';
         $nextMarker = '';
-        $maxkeys = 1000;
+        $maxkeys    = 1000;
 
         //存储结果
         $result = [];
 
-        while(true){
+        while (true) {
             $options = [
                 'delimiter' => $delimiter,
                 'prefix'    => $dirname,
@@ -362,7 +377,7 @@ class AliOssAdapter extends AbstractAdapter
 
                     $result['objects'][] = $object;
                 }
-            }else{
+            } else {
                 $result["objects"] = [];
             }
 
@@ -370,14 +385,14 @@ class AliOssAdapter extends AbstractAdapter
                 foreach ($prefixList as $prefixInfo) {
                     $result['prefix'][] = $prefixInfo->getPrefix();
                 }
-            }else{
+            } else {
                 $result['prefix'] = [];
             }
 
             //递归查询子目录所有文件
-            if($recursive){
-                foreach( $result['prefix'] as $pfix){
-                    $next  =  $this->listDirObjects($pfix , $recursive);
+            if ($recursive) {
+                foreach ($result['prefix'] as $pfix) {
+                    $next              = $this->listDirObjects($pfix, $recursive);
                     $result["objects"] = array_merge($result['objects'], $next["objects"]);
                 }
             }
@@ -396,13 +411,14 @@ class AliOssAdapter extends AbstractAdapter
      */
     public function createDir($dirname, Config $config)
     {
-        $object = $this->applyPathPrefix($dirname);
+        $object  = $this->applyPathPrefix($dirname);
         $options = $this->getOptionsFromConfig($config);
 
         try {
             $this->client->createObjectDir($this->bucket, $object, $options);
         } catch (OssException $e) {
             $this->logErr(__FUNCTION__, $e);
+
             return false;
         }
 
@@ -415,7 +431,8 @@ class AliOssAdapter extends AbstractAdapter
     public function setVisibility($path, $visibility)
     {
         $object = $this->applyPathPrefix($path);
-        $acl = ( $visibility === AdapterInterface::VISIBILITY_PUBLIC ) ? OssClient::OSS_ACL_TYPE_PUBLIC_READ : OssClient::OSS_ACL_TYPE_PRIVATE;
+        $acl    = ($visibility === AdapterInterface::VISIBILITY_PUBLIC) ? OssClient::OSS_ACL_TYPE_PUBLIC_READ
+            : OssClient::OSS_ACL_TYPE_PRIVATE;
 
         $this->client->putObjectAcl($this->bucket, $object, $acl);
 
@@ -437,9 +454,10 @@ class AliOssAdapter extends AbstractAdapter
      */
     public function read($path)
     {
-        $result = $this->readObject($path);
-        $result['contents'] = (string) $result['raw_contents'];
+        $result             = $this->readObject($path);
+        $result['contents'] = (string)$result['raw_contents'];
         unset($result['raw_contents']);
+
         return $result;
     }
 
@@ -448,7 +466,7 @@ class AliOssAdapter extends AbstractAdapter
      */
     public function readStream($path)
     {
-        $result = $this->readObject($path);
+        $result           = $this->readObject($path);
         $result['stream'] = $result['raw_contents'];
         rewind($result['stream']);
         // Ensure the EntityBody object destruction doesn't close the stream
@@ -461,7 +479,7 @@ class AliOssAdapter extends AbstractAdapter
     /**
      * Read an object from the OssClient.
      *
-     * @param string $path
+     * @param   string  $path
      *
      * @return array
      */
@@ -470,7 +488,8 @@ class AliOssAdapter extends AbstractAdapter
         $object = $this->applyPathPrefix($path);
 
         $result['Body'] = $this->client->getObject($this->bucket, $object);
-        $result = array_merge($result, ['type' => 'file']);
+        $result         = array_merge($result, ['type' => 'file']);
+
         return $this->normalizeResponse($result, $path);
     }
 
@@ -480,7 +499,7 @@ class AliOssAdapter extends AbstractAdapter
     public function listContents($directory = '', $recursive = false)
     {
         $dirObjects = $this->listDirObjects($directory, true);
-        $contents = $dirObjects["objects"];
+        $contents   = $dirObjects["objects"];
 
         $result = array_map([$this, 'normalizeResponse'], $contents);
         $result = array_filter($result, function ($value) {
@@ -501,6 +520,7 @@ class AliOssAdapter extends AbstractAdapter
             $objectMeta = $this->client->getObjectMeta($this->bucket, $object);
         } catch (OssException $e) {
             $this->logErr(__FUNCTION__, $e);
+
             return false;
         }
 
@@ -512,8 +532,9 @@ class AliOssAdapter extends AbstractAdapter
      */
     public function getSize($path)
     {
-        $object = $this->getMetadata($path);
+        $object         = $this->getMetadata($path);
         $object['size'] = $object['content-length'];
+
         return $object;
     }
 
@@ -522,8 +543,10 @@ class AliOssAdapter extends AbstractAdapter
      */
     public function getMimetype($path)
     {
-        if( $object = $this->getMetadata($path))
+        if ($object = $this->getMetadata($path)) {
             $object['mimetype'] = $object['content-type'];
+        }
+
         return $object;
     }
 
@@ -532,8 +555,10 @@ class AliOssAdapter extends AbstractAdapter
      */
     public function getTimestamp($path)
     {
-        if( $object = $this->getMetadata($path))
-            $object['timestamp'] = strtotime( $object['last-modified'] );
+        if ($object = $this->getMetadata($path)) {
+            $object['timestamp'] = strtotime($object['last-modified']);
+        }
+
         return $object;
     }
 
@@ -547,12 +572,13 @@ class AliOssAdapter extends AbstractAdapter
             $acl = $this->client->getObjectAcl($this->bucket, $object);
         } catch (OssException $e) {
             $this->logErr(__FUNCTION__, $e);
+
             return false;
         }
-        
-        if ($acl == OssClient::OSS_ACL_TYPE_PUBLIC_READ ){
+
+        if ($acl == OssClient::OSS_ACL_TYPE_PUBLIC_READ) {
             $res['visibility'] = AdapterInterface::VISIBILITY_PUBLIC;
-        }else{
+        } else {
             $res['visibility'] = AdapterInterface::VISIBILITY_PRIVATE;
         }
 
@@ -565,16 +591,36 @@ class AliOssAdapter extends AbstractAdapter
      *
      * @return string
      */
-    public function getUrl( $path )
+    public function getUrl($path)
     {
-        if (!$this->has($path)) throw new FileNotFoundException($filePath.' not found');
-        return ( $this->ssl ? 'https://' : 'http://' ) . ( $this->isCname ? ( $this->cdnDomain == '' ? $this->endPoint : $this->cdnDomain ) : $this->bucket . '.' . $this->endPoint ) . '/' . ltrim($path, '/');
+        if (!$this->has($path)) {
+            throw new FileNotFoundException($filePath . ' not found');
+        }
+
+        return $this->getSignUrl($path);
+
+//        return ($this->ssl ? 'https://' : 'http://') . ($this->isCname ? ($this->cdnDomain == '' ? $this->endPoint
+//                : $this->cdnDomain) : $this->bucket . '.' . $this->endPoint) . '/' . ltrim($path, '/');
+    }
+
+    /**
+     * @param   string  $object   object名称
+     * @param   int     $timeout  超时时间
+     * @param   string  $method   方法 OssClient::OSS_HTTP_GET|OssClient::OSS_HTTP_PUT
+     * @param   null    $options
+     *
+     * @return string
+     * @throws OssException
+     */
+    public function getSignUrl($object, $timeout = 60, $method = OssClient::OSS_HTTP_GET, $options = null)
+    {
+        return $this->client->signUrl($this->bucket, $object, $timeout, $method, $options);
     }
 
     /**
      * The the ACL visibility.
      *
-     * @param string $path
+     * @param   string  $path
      *
      * @return string
      */
@@ -582,20 +628,24 @@ class AliOssAdapter extends AbstractAdapter
     {
         $metadata = $this->getVisibility($path);
 
-        return $metadata['visibility'] === AdapterInterface::VISIBILITY_PUBLIC ? OssClient::OSS_ACL_TYPE_PUBLIC_READ : OssClient::OSS_ACL_TYPE_PRIVATE;
+        return $metadata['visibility'] === AdapterInterface::VISIBILITY_PUBLIC ? OssClient::OSS_ACL_TYPE_PUBLIC_READ
+            : OssClient::OSS_ACL_TYPE_PRIVATE;
     }
 
     /**
      * Normalize a result from OSS.
      *
-     * @param array  $object
-     * @param string $path
+     * @param   array   $object
+     * @param   string  $path
      *
      * @return array file metadata
      */
     protected function normalizeResponse(array $object, $path = null)
     {
-        $result = ['path' => $path ?: $this->removePathPrefix(isset($object['Key']) ? $object['Key'] : $object['Prefix'])];
+        $result            = [
+            'path' => $path
+                ?: $this->removePathPrefix(isset($object['Key']) ? $object['Key'] : $object['Prefix'])
+        ];
         $result['dirname'] = Util::dirname($result['path']);
 
         if (isset($object['LastModified'])) {
@@ -608,7 +658,7 @@ class AliOssAdapter extends AbstractAdapter
 
             return $result;
         }
-        
+
         $result = array_merge($result, Util::map($object, static::$resultMap), ['type' => 'file']);
 
         return $result;
@@ -617,7 +667,7 @@ class AliOssAdapter extends AbstractAdapter
     /**
      * Get options for a OSS call. done
      *
-     * @param array  $options
+     * @param   array  $options
      *
      * @return array OSS options
      */
@@ -635,7 +685,7 @@ class AliOssAdapter extends AbstractAdapter
     /**
      * Retrieve options from a Config instance. done
      *
-     * @param Config $config
+     * @param   Config  $config
      *
      * @return array
      */
@@ -644,7 +694,7 @@ class AliOssAdapter extends AbstractAdapter
         $options = [];
 
         foreach (static::$metaOptions as $option) {
-            if (! $config->has($option)) {
+            if (!$config->has($option)) {
                 continue;
             }
             $options[static::$metaMap[$option]] = $config->get($option);
@@ -654,7 +704,8 @@ class AliOssAdapter extends AbstractAdapter
             // For local reference
             // $options['visibility'] = $visibility;
             // For external reference
-            $options['x-oss-object-acl'] = $visibility === AdapterInterface::VISIBILITY_PUBLIC ? OssClient::OSS_ACL_TYPE_PUBLIC_READ : OssClient::OSS_ACL_TYPE_PRIVATE;
+            $options['x-oss-object-acl'] = $visibility === AdapterInterface::VISIBILITY_PUBLIC
+                ? OssClient::OSS_ACL_TYPE_PUBLIC_READ : OssClient::OSS_ACL_TYPE_PRIVATE;
         }
 
         if ($mimetype = $config->get('mimetype')) {
@@ -671,8 +722,9 @@ class AliOssAdapter extends AbstractAdapter
      * @param $fun string function name : __FUNCTION__
      * @param $e
      */
-    protected function logErr($fun, $e){
-        if( $this->debug ){
+    protected function logErr($fun, $e)
+    {
+        if ($this->debug) {
             Log::error($fun . ": FAILED");
             Log::error($e->getMessage());
         }
