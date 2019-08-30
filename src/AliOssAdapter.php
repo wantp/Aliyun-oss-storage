@@ -7,6 +7,9 @@
 
 namespace Jacobcyl\AliOSS;
 
+use AlibabaCloud\Client\AlibabaCloud;
+use AlibabaCloud\Client\Exception\ClientException;
+use AlibabaCloud\Sts\Sts;
 use Dingo\Api\Contract\Transformer\Adapter;
 use League\Flysystem\Adapter\AbstractAdapter;
 use League\Flysystem\AdapterInterface;
@@ -64,9 +67,16 @@ class AliOssAdapter extends AbstractAdapter
             'ContentEncoding'      => 'Content-Encoding',
         ];
 
-    //Aliyun OSS Client OssClient
+    // Aliyun OSS Client OssClient
     protected $client;
-    //bucket name
+
+    // 是否sts认证
+    protected $isSts;
+
+    // sts认证过期时间戳
+    protected $stsExpired = 0;
+
+    // bucket name
     protected $bucket;
 
     protected $endPoint;
@@ -83,39 +93,154 @@ class AliOssAdapter extends AbstractAdapter
             'Multipart' => 128
         ];
 
+    protected $accessKeyId;
+
+    protected $accessKeySecret;
+
+    protected $regionId = 'cn-shanghai';
+
+    protected $roleSessionName = 'default';
+
+    protected $roleArn = '';
+
+    protected $stsDuration = 3600;
+
+    protected $stsConnectTimeout = 1;
+
+    protected $stsRequestTimeouut = 3;
+
 
     /**
      * AliOssAdapter constructor.
      *
-     * @param   OssClient  $client
-     * @param   string     $bucket
-     * @param   string     $endPoint
-     * @param   bool       $ssl
-     * @param   bool       $isCname
-     * @param   bool       $debug
-     * @param   null       $prefix
-     * @param   array      $options
+     * @param   array   $config
+     * @param   string  $bucket
+     * @param   string  $endPoint
+     * @param   bool    $ssl
+     * @param   bool    $isCname
+     * @param   bool    $debug
+     * @param   null    $prefix
+     * @param   array   $options
      */
     public function __construct(
-        OssClient $client,
-        $bucket,
-        $endPoint,
-        $ssl,
-        $isCname = false,
-        $debug = false,
-        $cdnDomain,
+        array $config,
         $prefix = null,
         array $options = []
     ) {
-        $this->debug  = $debug;
-        $this->client = $client;
-        $this->bucket = $bucket;
+        $this->initConfig($config);
+
         $this->setPathPrefix($prefix);
-        $this->endPoint  = $endPoint;
-        $this->ssl       = $ssl;
-        $this->isCname   = $isCname;
-        $this->cdnDomain = $cdnDomain;
-        $this->options   = array_merge($this->options, $options);
+
+        $this->options = array_merge($this->options, $options);
+    }
+
+    /**
+     * init Config
+     *
+     * @param $config
+     *
+     * @throws ClientException
+     */
+    protected function initConfig($config)
+    {
+        $this->validateConfig($config);
+
+        $endPoint = $isCname ? $cdnDomain : (empty($config['endpoint_internal']) ? $config['endpoint'] : $config['endpoint_internal']);
+
+        $this->accessKeyId        = $config['access_id'];
+        $this->accessKeySecret    = $config['access_key'];
+        $this->regionId           = $config['regionId'] ?? '';
+        $this->debug              = $config['debug'] ?? false;
+        $this->endPoint           = $endPoint;
+        $this->cdnDomain          = $config['cdnDomain'] ?? '';
+        $this->bucket             = $config['bucket'];
+        $this->ssl                = $config['ssl'] ?? false;
+        $this->isCname            = $config['isCName'] ?? false;
+        $this->isSts              = $config['isSts'] ?? false;
+        $this->roleSessionName    = $config['roleSessionName'] ?? $this->roleSessionName;
+        $this->roleArn            = $config['roleArn'] ?? '';
+        $this->stsDuration        = $config['stsDuration'] ?? $this->stsDuration;
+        $this->stsConnectTimeout  = $config['stsConnectTimeout'] ?? $this->stsConnectTimeout;
+        $this->stsRequestTimeouut = $config['stsRequestTimeouut'] ?? $this->stsRequestTimeouut;
+    }
+
+    /**
+     * Validate config
+     *
+     * @param $config
+     *
+     * @throws ClientException
+     */
+    protected function validateConfig($config)
+    {
+        $requiredConfig = ['access_id', 'access_key', 'bucket', 'endpoint'];
+        foreach ($requiredConfig as $configKey) {
+            if (!array_key_exists($configKey, $config)) {
+                throw new ClientException('required ' . $configKey . ' config');
+            }
+        }
+        if (isset($config['isSts']) && $config['isSts']) {
+            $stsRequireConfig = ['roleArn'];
+            foreach ($stsRequireConfig as $configKey) {
+                if (!array_key_exists($configKey, $config)) {
+                    throw new ClientException('If isSts is true,required ' . $configKey . ' config');
+                }
+            }
+        }
+    }
+
+    /**
+     * Get the OssClient
+     *
+     * @return OssClient
+     */
+    public function getClient()
+    {
+        if (!($this->client instanceof OssClient && ($this->isSts && $this->stsExpired > time()) || !$this->isSts)) {
+
+            $accessKeyId     = $this->accessKeyId;
+            $accessKeySecret = $this->accessKeySecret;
+            $endPoint        = $this->endPoint;
+            $isCname         = $this->isCname;
+            $securityToken   = null;
+
+            // 如果sts认证超时，重新获取
+            if ($this->isSts && $this->stsExpired <= time()) {
+                $stsAuth         = $this->stsAuth();
+                $accessKeyId     = $stsAuth['Credentials']['AccessKeyId'];
+                $accessKeySecret = $stsAuth['Credentials']['AccessKeySecret'];
+                $securityToken   = $stsAuth['Credentials']['SecurityToken'];
+            }
+
+            $this->client = new OssClient($accessKeyId, $accessKeySecret, $endPoint, $isCname, $securityToken);
+        }
+
+        return $this->client;
+    }
+
+    /**
+     * get sts auth
+     *
+     * @return mixed
+     * @throws ClientException
+     */
+    public function stsAuth()
+    {
+        AlibabaCloud::accessKeyClient($this->accessKeyId, $this->accessKeySecret)->regionId($this->regionId)->asDefaultClient();
+
+        $request = Sts::v20150401()->assumeRole();
+
+        $result = $request->debug(false)
+            ->setRoleSessionName($this->roleSessionName)
+            ->setRoleArn($this->roleArn)
+            ->setDurationSeconds($this->stsDuration)
+            ->connectTimeout($this->stsConnectTimeout)
+            ->timeout($this->stsRequestTimeouut)
+            ->request();
+
+        $result = json_decode($result, true);
+
+        return $result;
     }
 
     /**
@@ -126,16 +251,6 @@ class AliOssAdapter extends AbstractAdapter
     public function getBucket()
     {
         return $this->bucket;
-    }
-
-    /**
-     * Get the OSSClient instance.
-     *
-     * @return OssClient
-     */
-    public function getClient()
-    {
-        return $this->client;
     }
 
     /**
@@ -159,7 +274,7 @@ class AliOssAdapter extends AbstractAdapter
             $options[OssClient::OSS_CONTENT_TYPE] = Util::guessMimeType($path, $contents);
         }
         try {
-            $this->client->putObject($this->bucket, $object, $contents, $options);
+            $this->getClient()->putObject($this->bucket, $object, $contents, $options);
         } catch (OssException $e) {
             $this->logErr(__FUNCTION__, $e);
 
@@ -197,7 +312,7 @@ class AliOssAdapter extends AbstractAdapter
             $options[OssClient::OSS_CONTENT_TYPE] = Util::guessMimeType($path, '');
         }
         try {
-            $this->client->uploadFile($this->bucket, $object, $filePath, $options);
+            $this->getClient()->uploadFile($this->bucket, $object, $filePath, $options);
         } catch (OssException $e) {
             $this->logErr(__FUNCTION__, $e);
 
@@ -262,7 +377,7 @@ class AliOssAdapter extends AbstractAdapter
         $object    = $this->applyPathPrefix($path);
         $newObject = $this->applyPathPrefix($newpath);
         try {
-            $this->client->copyObject($this->bucket, $object, $this->bucket, $newObject);
+            $this->getClient()->copyObject($this->bucket, $object, $this->bucket, $newObject);
         } catch (OssException $e) {
             $this->logErr(__FUNCTION__, $e);
 
@@ -281,7 +396,7 @@ class AliOssAdapter extends AbstractAdapter
         $object = $this->applyPathPrefix($path);
 
         try {
-            $this->client->deleteObject($bucket, $object);
+            $this->getClient()->deleteObject($bucket, $object);
         } catch (OssException $e) {
             $this->logErr(__FUNCTION__, $e);
 
@@ -306,7 +421,7 @@ class AliOssAdapter extends AbstractAdapter
             }
 
             try {
-                $this->client->deleteObjects($this->bucket, $objects);
+                $this->getClient()->deleteObjects($this->bucket, $objects);
             } catch (OssException $e) {
                 $this->logErr(__FUNCTION__, $e);
 
@@ -316,7 +431,7 @@ class AliOssAdapter extends AbstractAdapter
         }
 
         try {
-            $this->client->deleteObject($this->bucket, $dirname);
+            $this->getClient()->deleteObject($this->bucket, $dirname);
         } catch (OssException $e) {
             $this->logErr(__FUNCTION__, $e);
 
@@ -353,7 +468,7 @@ class AliOssAdapter extends AbstractAdapter
             ];
 
             try {
-                $listObjectInfo = $this->client->listObjects($this->bucket, $options);
+                $listObjectInfo = $this->getClient()->listObjects($this->bucket, $options);
             } catch (OssException $e) {
                 $this->logErr(__FUNCTION__, $e);
                 // return false;
@@ -415,7 +530,7 @@ class AliOssAdapter extends AbstractAdapter
         $options = $this->getOptionsFromConfig($config);
 
         try {
-            $this->client->createObjectDir($this->bucket, $object, $options);
+            $this->getClient()->createObjectDir($this->bucket, $object, $options);
         } catch (OssException $e) {
             $this->logErr(__FUNCTION__, $e);
 
@@ -434,7 +549,7 @@ class AliOssAdapter extends AbstractAdapter
         $acl    = ($visibility === AdapterInterface::VISIBILITY_PUBLIC) ? OssClient::OSS_ACL_TYPE_PUBLIC_READ
             : OssClient::OSS_ACL_TYPE_PRIVATE;
 
-        $this->client->putObjectAcl($this->bucket, $object, $acl);
+        $this->getClient()->putObjectAcl($this->bucket, $object, $acl);
 
         return compact('visibility');
     }
@@ -446,7 +561,7 @@ class AliOssAdapter extends AbstractAdapter
     {
         $object = $this->applyPathPrefix($path);
 
-        return $this->client->doesObjectExist($this->bucket, $object);
+        return $this->getClient()->doesObjectExist($this->bucket, $object);
     }
 
     /**
@@ -487,7 +602,7 @@ class AliOssAdapter extends AbstractAdapter
     {
         $object = $this->applyPathPrefix($path);
 
-        $result['Body'] = $this->client->getObject($this->bucket, $object);
+        $result['Body'] = $this->getClient()->getObject($this->bucket, $object);
         $result         = array_merge($result, ['type' => 'file']);
 
         return $this->normalizeResponse($result, $path);
@@ -517,7 +632,7 @@ class AliOssAdapter extends AbstractAdapter
         $object = $this->applyPathPrefix($path);
 
         try {
-            $objectMeta = $this->client->getObjectMeta($this->bucket, $object);
+            $objectMeta = $this->getClient()->getObjectMeta($this->bucket, $object);
         } catch (OssException $e) {
             $this->logErr(__FUNCTION__, $e);
 
@@ -569,7 +684,7 @@ class AliOssAdapter extends AbstractAdapter
     {
         $object = $this->applyPathPrefix($path);
         try {
-            $acl = $this->client->getObjectAcl($this->bucket, $object);
+            $acl = $this->getClient()->getObjectAcl($this->bucket, $object);
         } catch (OssException $e) {
             $this->logErr(__FUNCTION__, $e);
 
@@ -614,7 +729,7 @@ class AliOssAdapter extends AbstractAdapter
      */
     public function getSignUrl($object, $timeout = 60, $method = OssClient::OSS_HTTP_GET, $options = null)
     {
-        return $this->client->signUrl($this->bucket, $object, $timeout, $method, $options);
+        return $this->getClient()->signUrl($this->bucket, $object, $timeout, $method, $options);
     }
 
     /**
