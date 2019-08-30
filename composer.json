@@ -15,7 +15,9 @@
         }
     ],
     "require": {
-        "aliyuncs/oss-sdk-php": "~2.0"
+        "php": "^7.0",
+        "aliyuncs/oss-sdk-php": "~2.0",
+        "alibabacloud/sdk": "^1.7"
     },
     "autoload": {
         "psr-4": {
