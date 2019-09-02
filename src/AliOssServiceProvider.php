@@ -34,9 +34,6 @@ class AliOssServiceProvider extends ServiceProvider
         */
 
         Storage::extend('oss', function ($app, $config) {
-            if ($debug) {
-                Log::debug('OSS config:', $config);
-            }
 
             $adapter = new AliOssAdapter($config);
 

@@ -145,13 +145,10 @@ class AliOssAdapter extends AbstractAdapter
     {
         $this->validateConfig($config);
 
-        $endPoint = $isCname ? $cdnDomain : (empty($config['endpoint_internal']) ? $config['endpoint'] : $config['endpoint_internal']);
-
         $this->accessKeyId        = $config['access_id'];
         $this->accessKeySecret    = $config['access_key'];
-        $this->regionId           = $config['regionId'] ?? '';
+        $this->regionId           = $config['regionId'] ?? $this->regionId;
         $this->debug              = $config['debug'] ?? false;
-        $this->endPoint           = $endPoint;
         $this->cdnDomain          = $config['cdnDomain'] ?? '';
         $this->bucket             = $config['bucket'];
         $this->ssl                = $config['ssl'] ?? false;
@@ -162,6 +159,7 @@ class AliOssAdapter extends AbstractAdapter
         $this->stsDuration        = $config['stsDuration'] ?? $this->stsDuration;
         $this->stsConnectTimeout  = $config['stsConnectTimeout'] ?? $this->stsConnectTimeout;
         $this->stsRequestTimeouut = $config['stsRequestTimeouut'] ?? $this->stsRequestTimeouut;
+        $this->endPoint           = $this->isCname ? $this->cdnDomain : (empty($config['endpoint_internal']) ? $config['endpoint'] : $config['endpoint_internal']);
     }
 
     /**
@@ -180,7 +178,7 @@ class AliOssAdapter extends AbstractAdapter
             }
         }
         if (isset($config['isSts']) && $config['isSts']) {
-            $stsRequireConfig = ['roleArn'];
+            $stsRequireConfig = ['roleArn', 'regionId'];
             foreach ($stsRequireConfig as $configKey) {
                 if (!array_key_exists($configKey, $config)) {
                     throw new ClientException('If isSts is true,required ' . $configKey . ' config');
@@ -727,7 +725,7 @@ class AliOssAdapter extends AbstractAdapter
      * @return string
      * @throws OssException
      */
-    public function getSignUrl($object, $timeout = 60, $method = OssClient::OSS_HTTP_GET, $options = null)
+    public function getSignUrl($object, $timeout = 3600, $method = OssClient::OSS_HTTP_GET, $options = null)
     {
         return $this->getClient()->signUrl($this->bucket, $object, $timeout, $method, $options);
     }

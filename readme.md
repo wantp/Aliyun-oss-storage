@@ -12,12 +12,12 @@ Aliyun oss filesystem storage adapter for laravel 5. You can use Aliyun OSS just
 ##Installation
 In order to install AliOSS-storage, just add
 
-    "jacobcyl/ali-oss-storage": "^2.1"
+    "wantp/ali-oss-storage": "^1.0"
 
 to your composer.json. Then run `composer install` or `composer update`.  
 Or you can simply run below command to install:
 
-    "composer require jacobcyl/ali-oss-storage:^2.1"
+    "composer require wantp/ali-oss-storage:^1.0"
     
 Then in your `config/app.php` add this line to providers array:
 ```php
@@ -29,16 +29,33 @@ Add the following in app/filesystems.php:
 'disks'=>[
     ...
     'oss' => [
-            'driver'        => 'oss',
-            'access_id'     => '<Your Aliyun OSS AccessKeyId>',
-            'access_key'    => '<Your Aliyun OSS AccessKeySecret>',
-            'bucket'        => '<OSS bucket name>',
-            'endpoint'      => '<the endpoint of OSS, E.g: oss-cn-hangzhou.aliyuncs.com | custom domain, E.g:img.abc.com>', // OSS 外网节点或自定义外部域名
-            //'endpoint_internal' => '<internal endpoint [OSS内网节点] 如：oss-cn-shenzhen-internal.aliyuncs.com>', // v2.0.4 新增配置属性，如果为空，则默认使用 endpoint 配置(由于内网上传有点小问题未解决，请大家暂时不要使用内网节点上传，正在与阿里技术沟通中)
-            'cdnDomain'     => '<CDN domain, cdn域名>', // 如果isCName为true, getUrl会判断cdnDomain是否设定来决定返回的url，如果cdnDomain未设置，则使用endpoint来生成url，否则使用cdn
-            'ssl'           => <true|false> // true to use 'https://' and false to use 'http://'. default is false,
-            'isCName'       => <true|false> // 是否使用自定义域名,true: 则Storage.url()会使用自定义的cdn或域名生成文件url， false: 则使用外部节点生成url
-            'debug'         => <true|false>
+            'driver'            => 'oss',
+            'access_id'         => '<Your Aliyun OSS AccessKeyId>',
+            'access_key'        => '<Your Aliyun OSS AccessKeySecret>',
+            'bucket'            => '<OSS bucket name>',
+            // OSS 外网节点或自定义外部域名
+            'endpoint'          => '<the endpoint of OSS, E.g: oss-cn-hangzhou.aliyuncs.com | custom domain, E.g:img.abc.com>',
+            // v2.0.4 新增配置属性，如果为空，则默认使用 endpoint 配置(由于内网上传有点小问题未解决，请大家暂时不要使用内网节点上传，正在与阿里技术沟通中)            
+            //'endpoint_internal' => '<internal endpoint [OSS内网节点] 如：oss-cn-shenzhen-internal.aliyuncs.com>',
+            // 如果isCName为true, getUrl会判断cdnDomain是否设定来决定返回的url，如果cdnDomain未设置，则使用endpoint来生成url，否则使用cdn
+            'cdnDomain'         => '<CDN domain, cdn域名>',
+            // true|false true to use 'https://' and false to use 'http://'. default is false,
+            'ssl'               => false,
+            // true|false 是否使用自定义域名,true: 则Storage.url()会使用自定义的cdn或域名生成文件url， false: 则使用外部节点生成url
+            'isCName'           => false,
+            // true|false
+            'debug'             => false,
+            // 是否STS认证
+            'isSts'             => false,
+            // 角色ARN，isSts为true时必填，在阿里云RAM控制台中的角色详情中查看ARN
+            'roleArn'           => '',
+            'roleSessionName'   => 'default',
+            // 选填项，默认值3600，sts认证的有效时间，单位秒
+            'stsDuration'       => 3600,
+            // 选填项，默认值1，client连接超时时间，单位秒
+            'stsConnectTimeout' => 1,
+            // 选填项，默认值3，client请求接口超时时间，单位秒
+            'stsRequestTimeout' => 3,
     ],
     ...
 ]
