@@ -8,12 +8,12 @@
 ##Installation
 In order to install AliOSS-storage, just add
 
-    "wantp/ali-oss-storage": "^2.3"
+    "wantp/ali-oss-storage": "^2.2"
 
 to your composer.json. Then run `composer install` or `composer update`.  
 Or you can simply run below command to install:
 
-    "composer require wantp/ali-oss-storage:^2.3"
+    "composer require wantp/ali-oss-storage:^2.2"
     
 ## Configuration
 Add the following in app/filesystems.php:

@@ -226,7 +226,7 @@ class AliOssAdapter extends AbstractAdapter
             ->setRoleArn($this->roleArn)
             ->setDurationSeconds($this->stsDuration)
             ->connectTimeout($this->stsConnectTimeout)
-            ->timeout($this->stsRequestTimeouut)
+            ->timeout($this->stsRequestTimeout)
             ->request();
 
         $result = json_decode($result, true);
