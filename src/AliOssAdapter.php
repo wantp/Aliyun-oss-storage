@@ -107,26 +107,18 @@ class AliOssAdapter extends AbstractAdapter
 
     protected $stsConnectTimeout = 1;
 
-    protected $stsRequestTimeouut = 3;
+    protected $stsRequestTimeout = 3;
 
 
     /**
      * AliOssAdapter constructor.
      *
-     * @param   array   $config
-     * @param   string  $bucket
-     * @param   string  $endPoint
-     * @param   bool    $ssl
-     * @param   bool    $isCname
-     * @param   bool    $debug
-     * @param   null    $prefix
-     * @param   array   $options
+     * @param   array  $config
+     * @param   null   $prefix
+     * @param   array  $options
      */
-    public function __construct(
-        array $config,
-        $prefix = null,
-        array $options = []
-    ) {
+    public function __construct(array $config, $prefix = null, array $options = [])
+    {
         $this->initConfig($config);
 
         $this->setPathPrefix($prefix);
@@ -145,21 +137,21 @@ class AliOssAdapter extends AbstractAdapter
     {
         $this->validateConfig($config);
 
-        $this->accessKeyId        = $config['access_id'];
-        $this->accessKeySecret    = $config['access_key'];
-        $this->regionId           = $config['regionId'] ?? $this->regionId;
-        $this->debug              = $config['debug'] ?? false;
-        $this->cdnDomain          = $config['cdnDomain'] ?? '';
-        $this->bucket             = $config['bucket'];
-        $this->ssl                = $config['ssl'] ?? false;
-        $this->isCname            = $config['isCName'] ?? false;
-        $this->isSts              = $config['isSts'] ?? false;
-        $this->roleSessionName    = $config['roleSessionName'] ?? $this->roleSessionName;
-        $this->roleArn            = $config['roleArn'] ?? '';
-        $this->stsDuration        = $config['stsDuration'] ?? $this->stsDuration;
-        $this->stsConnectTimeout  = $config['stsConnectTimeout'] ?? $this->stsConnectTimeout;
-        $this->stsRequestTimeouut = $config['stsRequestTimeouut'] ?? $this->stsRequestTimeouut;
-        $this->endPoint           = $this->isCname ? $this->cdnDomain : (empty($config['endpoint_internal']) ? $config['endpoint'] : $config['endpoint_internal']);
+        $this->accessKeyId       = $config['access_id'];
+        $this->accessKeySecret   = $config['access_key'];
+        $this->regionId          = $config['regionId'] ?? $this->regionId;
+        $this->debug             = $config['debug'] ?? false;
+        $this->cdnDomain         = $config['cdnDomain'] ?? '';
+        $this->bucket            = $config['bucket'];
+        $this->ssl               = $config['ssl'] ?? false;
+        $this->isCname           = $config['isCName'] ?? false;
+        $this->isSts             = $config['isSts'] ?? false;
+        $this->roleSessionName   = $config['roleSessionName'] ?? $this->roleSessionName;
+        $this->roleArn           = $config['roleArn'] ?? '';
+        $this->stsDuration       = $config['stsDuration'] ?? $this->stsDuration;
+        $this->stsConnectTimeout = $config['stsConnectTimeout'] ?? $this->stsConnectTimeout;
+        $this->stsRequestTimeout = $config['stsRequestTimeout'] ?? $this->stsRequestTimeout;
+        $this->endPoint          = $this->isCname ? $this->cdnDomain : (empty($config['endpoint_internal']) ? $config['endpoint'] : $config['endpoint_internal']);
     }
 
     /**
@@ -204,10 +196,11 @@ class AliOssAdapter extends AbstractAdapter
 
             // 如果sts认证超时，重新获取
             if ($this->isSts && $this->stsExpired <= time()) {
-                $stsAuth         = $this->stsAuth();
-                $accessKeyId     = $stsAuth['Credentials']['AccessKeyId'];
-                $accessKeySecret = $stsAuth['Credentials']['AccessKeySecret'];
-                $securityToken   = $stsAuth['Credentials']['SecurityToken'];
+                $stsAuth          = $this->stsAuth();
+                $accessKeyId      = $stsAuth['Credentials']['AccessKeyId'];
+                $accessKeySecret  = $stsAuth['Credentials']['AccessKeySecret'];
+                $securityToken    = $stsAuth['Credentials']['SecurityToken'];
+                $this->stsExpired = time() + $this->stsDuration;
             }
 
             $this->client = new OssClient($accessKeyId, $accessKeySecret, $endPoint, $isCname, $securityToken);
